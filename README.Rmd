@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 install packages
-```{r}
+```{r,eval=FALSE}
 install.packages(c("dplyr","shiny","rtweet","ggplot2","plotly","shinydashboard","randomForest"),repos="https://cloud.r-project.org") 
 ```
 
