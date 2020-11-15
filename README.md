@@ -1,5 +1,5 @@
 
-install packages
+Install packages
 
     install.packages(c("dplyr","shiny","rtweet","ggplot2","plotly","shinydashboard","randomForest"),repos="https://cloud.r-project.org") 
 
