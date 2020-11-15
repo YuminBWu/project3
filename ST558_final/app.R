@@ -63,7 +63,7 @@ ui <- dashboardPage(
               fluidRow(
                 box(radioButtons("radio", "Selection",   
                                  c("friends count vs retweet count"="friends count vs retweet count",
-                                   "Frequency of rstats Twitter statuses"="Frequency of rstats Twitter statuses"
+                                   "favourites count vs friends count"="favourites count vs friends count"
                                  )),
                     plotlyOutput("distPlot")),
                 
@@ -275,7 +275,7 @@ server <- function(input, output,session) {
            #filter(city %in% input$cities) %>%
            #group_by(city)
          }else{
-         if(input$radio=='Frequency of rstats Twitter statuses')
+         if(input$radio=='favourites count vs friends count')
          {
            # p2
            plot_ly(rt, x = ~friends_count, y = ~favourites_count)
