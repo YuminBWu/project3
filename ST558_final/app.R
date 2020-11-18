@@ -6,9 +6,10 @@ library(shinydashboard)
 library(dplyr)
 library(randomForest)
 
-## search for 1000 tweets using the rstats hashtag
+ntw = 2000
+## search for 2000 tweets using the rstats hashtag
 rt <- search_tweets(
-  "#rstats", n = 1000, include_rts = FALSE
+  "#rstats", n = ntw, include_rts = FALSE
 )
 
 ## preview tweets data
@@ -30,32 +31,38 @@ p2<-ts_plot(rt, "3 hours") +
     caption = "\nSource: Data collected from Twitter's REST API via rtweet"
   )
 
-tmls <- get_timelines(c("cnn","BBCWorld","FoxNews"), n = 3200)
-
+# tmls <- get_timelines(c("CNN","BBCWorld","FoxNews"), n = 3200)
+tml_cnn = search_tweets(q=c("CNN"), n = ntw, include_rts = FALSE)
+tml_cnn$ch = 'CNN'
+tml_bbc = search_tweets(q=c("BBCWorld"),n = ntw, include_rts = FALSE)
+tml_bbc$ch = 'BBCWorld'
+tml_fox = search_tweets(q=c("FoxNews"), n = ntw, include_rts = FALSE)
+tml_fox$ch = 'FoxNews'
+tmls = rbind(tml_cnn,tml_bbc,tml_fox)
 
 ui <- dashboardPage(
   
   dashboardHeader(title = "Collecting Twitter Data"),
   dashboardSidebar(
     sidebarMenu(
-      menuItem("Data information", tabName = "page1", icon = icon("dashboard")),
-      menuItem("Summary", tabName = "page2", icon = icon("dashboard")),
-      menuItem("Clustering", tabName = "page3", icon = icon("dashboard")),
-      menuItem("Modeling", tabName = "page4", icon = icon("dashboard")),
-      menuItem("Save data", tabName = "page5", icon = icon("dashboard"))
+      menuItem("Data information", tabName = "page1", icon = icon("info")),
+      menuItem("Summary", tabName = "page2", icon = icon("chart-bar")),
+      menuItem("Clustering", tabName = "page3", icon = icon("project-diagram")),
+      menuItem("Modeling", tabName = "page4", icon = icon("laptop")),
+      menuItem("Save data", tabName = "page5", icon = icon("save"))
     )
   ),
   dashboardBody(
     tabItems(
       # First tab content
       tabItem(tabName = "page1",
-              h2("This is a dataset of",strong("tweets"),".", "The app can provide you with summary of the dataset."),
-              h3("This dataset comes from the", a("rtweet package",href="https://cran.r-project.org/web/packages/rtweet/vignettes/intro.html")),
-              h4("The data set is about twitter such as the number of retweet,the number of favourite, the number of followers,the number of friends,etc."),
-              h3("The user can perform linear regression and random forest to investigate the relationship between counts."),
+              h2("This is a shiny program about the dataset of",strong("tweets"),"."), 
+              p("The app can provide you with summary of the dataset. This dataset comes from the", a("rtweet package",href="https://cran.r-project.org/web/packages/rtweet/vignettes/intro.html"),
+                ". The data set is about twitter such as the number of retweet, the number of favourite, the number of followers, the number of friends, etc."),
+              p("The users can visualize the data and can perform linear regression and random forest to investigate the relationship between tweet counts."),
               withMathJax(),
-              helpText('The linear regression is based on $$y=\\mu + \\beta x + \\epsilon$$.'),
-              helpText('$$\\epsilon \\sim N(0,\\sigma^2) $$')
+              helpText('The linear regression is based on the following model: $$y=\\mu + \\beta x + \\epsilon$$'),
+              helpText('where $$\\epsilon \\sim N(0,\\sigma^2) $$')
       ),
       
       # Second tab content
@@ -63,11 +70,11 @@ ui <- dashboardPage(
               fluidRow(
                 box(radioButtons("radio", "Selection",   
                                  c("friends count vs retweet count"="friends count vs retweet count",
-                                   "Frequency of rstats Twitter statuses"="Frequency of rstats Twitter statuses"
+                                   "favourites count vs friends count"="favourites count vs friends count"
                                  )),
                     plotlyOutput("distPlot")),
                 
-                box(selectInput("organization", "organization",  levels(as.factor(tmls$screen_name)),selected = "BBCWorld"),
+                box(selectInput("organization", "organization",  unique(tmls$ch),selected = "BBCWorld"),
                
                 plotOutput("frequency")),
                 
@@ -103,8 +110,11 @@ ui <- dashboardPage(
                 
                 box(tableOutput("table")),
                 
-                box(textInput('inputt',"Input the value of the predictor",value='0'),
-                    textOutput('predicted')
+                conditionalPanel(
+                  condition = "input.radiom == 'Linear regression'",
+                  box(
+                  textInput('inputt',"Input the value of the predictor",value='0'),
+                  textOutput('predicted'))
                 )
                 
               )
@@ -131,10 +141,7 @@ ui <- dashboardPage(
 
 # Define server logic required to draw a histogram
 server <- function(input, output,session) {
-  
-  
 
-  
   pl = 
     reactive({
       if(input$unsupervised_learning=="principal components analysis"){PCs<-prcomp(select(tmls,favorite_count,retweet_count),scale=TRUE)
@@ -184,13 +191,11 @@ server <- function(input, output,session) {
   output$frequency <- renderPlot({
  
     if(input$organization=='CNN'){
-      
-      tmls <- get_timelines(c("CNN"), n = 3200)
-   
         tmls %>%
         dplyr::filter(created_at > "2017-10-29") %>%
-        dplyr::group_by(screen_name) %>%
-        ts_plot("days", trim = 1L) +
+        dplyr::filter(ch == "CNN") %>%
+        # dplyr::group_by(screen_name) %>%
+        ts_plot("60 secs", trim = 1L) +
         ggplot2::geom_point(size = input$size) +
         ggplot2::theme_minimal() +
         ggplot2::theme(
@@ -200,7 +205,7 @@ server <- function(input, output,session) {
         ggplot2::labs(
           x = NULL, y = NULL,
           title = "Frequency of Twitter statuses posted by news organization",
-          subtitle = "Twitter status (tweet) counts aggregated by day from October/November 2017",
+          subtitle = "Twitter status (tweet) counts aggregated by one minute from the latest 2000 tweets",
           caption = "\nSource: Data collected from Twitter's REST API via rtweet"
         )
       
@@ -208,12 +213,11 @@ server <- function(input, output,session) {
     } else {
       if(input$organization=='BBCWorld')
       {
-        tmls <- get_timelines(c("BBCWorld"), n = 3200)
-
         tmls %>%
           dplyr::filter(created_at > "2017-10-29") %>%
-          dplyr::group_by(screen_name) %>%
-          ts_plot("days", trim = 1L) +
+          dplyr::filter(ch == "BBCWorld") %>%
+          # dplyr::group_by(screen_name) %>%
+          ts_plot("60 secs", trim = 1L) +
           ggplot2::geom_point(size = input$size) +
           ggplot2::theme_minimal() +
           ggplot2::theme(
@@ -223,17 +227,18 @@ server <- function(input, output,session) {
           ggplot2::labs(
             x = NULL, y = NULL,
             title = "Frequency of Twitter statuses posted by news organization",
-            subtitle = "Twitter status (tweet) counts aggregated by day from October/November 2017",
+            subtitle = "Twitter status (tweet) counts aggregated by one minute from the latest 2000 tweets",
             caption = "\nSource: Data collected from Twitter's REST API via rtweet"
           )
       }else{
         if(input$organization=='FoxNews')
-          {tmls <- get_timelines(c("FoxNews"), n = 3200)
+          {
         
          tmls %>%
           dplyr::filter(created_at > "2017-10-29") %>%
-          dplyr::group_by(screen_name) %>%
-          ts_plot("days", trim = 1L) +
+            dplyr::filter(ch == "FoxNews") %>%
+          # dplyr::group_by(screen_name) %>%
+          ts_plot("60 secs", trim = 1L) +
           ggplot2::geom_point(size = input$size) +
           ggplot2::theme_minimal() +
           ggplot2::theme(
@@ -243,7 +248,7 @@ server <- function(input, output,session) {
           ggplot2::labs(
             x = NULL, y = NULL,
             title = "Frequency of Twitter statuses posted by news organization",
-            subtitle = "Twitter status (tweet) counts aggregated by day from October/November 2017",
+            subtitle = "Twitter status (tweet) counts aggregated by one minute from the latest 2000 tweets",
             caption = "\nSource: Data collected from Twitter's REST API via rtweet"
           )}
       }
@@ -257,11 +262,18 @@ server <- function(input, output,session) {
     if(input$organization=='BBCWorld'){
       val <- input$size
       updateSliderInput(session, "size", 
-                        min = 1, max = 10, value = val, step = 1)
+                        min = 1, max = 3, value = val, step = 1)
     } else {
+      if(input$organization=='CNN')
+      {
+        val <- input$size
+        updateSliderInput(session, "size", 
+                          min = 1, max = 20, value = val, step = 1)
+      }else{
       val <- input$size
       updateSliderInput(session, "size", 
-                        min = 1, max = 30, value = val, step = 1)
+                        min = 1, max = 10, value = val, step = 1)
+      }
     }
   })
   
@@ -275,7 +287,7 @@ server <- function(input, output,session) {
            #filter(city %in% input$cities) %>%
            #group_by(city)
          }else{
-         if(input$radio=='Frequency of rstats Twitter statuses')
+         if(input$radio=='favourites count vs friends count')
          {
            # p2
            plot_ly(rt, x = ~friends_count, y = ~favourites_count)
@@ -290,18 +302,16 @@ server <- function(input, output,session) {
          pv = input$indv
          re = lm(as.formula(paste0(dv,'~',pv)),rt)
          t = as.data.frame(summary(re)$coef)
-         t$variable = rownames(summary(re)$coef)
+         t$Variable = rownames(summary(re)$coef)
          t
        }else{
          dv = input$depv
          re = randomForest(as.formula(paste0(dv,' ~ friends_count+followers_count+listed_count+is_retweet')), data = rt, method = "rf",nbagg = 200,importance=TRUE)
          t = as.data.frame(re$importance)
-         t$variable = rownames(t)
+         t$Variable = rownames(t)
          t
        }
      })
-     
-   
      
      
      output$predicted = renderText({
@@ -311,7 +321,7 @@ server <- function(input, output,session) {
        pr = as.numeric(input$inputt)
        pdf = data.frame(pv = pr)
        colnames(pdf) = pv
-       paste0("The predicted value is ",round(predict(re, pdf)),".")
+       paste0("The predicted value of ", dv, " is ",round(predict(re, pdf)),".")
      })
      
      
@@ -345,5 +355,5 @@ server <- function(input, output,session) {
 
 
 # Run the application 
-shinyApp(ui = ui, server = server)
+shinyApp(ui = ui, server = server) 
 
